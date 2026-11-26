@@ -57,8 +57,33 @@ jobs:
 
       - name: Build Web Application
         run: npm run build
+      
+      - name: Install Capacitor Android
+        run: |
+          CAP_VERSION=$(node -p "require('./node_modules/@capacitor/core/package.json').version")
+          npm install --no-save --legacy-peer-deps "@capacitor/android@$CAP_VERSION"
+
+      - name: Add Android Platform
+        run: |
+          if [ ! -d android ]; then
+            npx cap add android
+          fi
+
       - name: Capacitor Android Sync
         run: npx cap sync android
+
+      - name: Build Debug APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Upload Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: GoodChat-Android-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
       - name: Build Debug APK
         run: |
           cd android
