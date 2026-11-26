@@ -1,21 +1,16 @@
 
-          
 name: Build Good Chat Android APK
-
 on:
   push:
     branches:
       - main
   workflow_dispatch:
-
 permissions:
   contents: read
-
 jobs:
   build:
     name: Build Android APK
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -24,25 +19,20 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-
       - name: Setup Java
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
-
       - name: Install Android SDK Packages
         run: |
           SDK_ROOT="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
           echo "Android SDK: $SDK_ROOT"
-
           SDKMANAGER=$(find "$SDK_ROOT/cmdline-tools" -name sdkmanager -type f | head -n 1)
-
           if [ -z "$SDKMANAGER" ]; then
             echo "sdkmanager not found"
             exit 1
           fi
-
           yes | "$SDKMANAGER" --licenses || true
 
           "$SDKMANAGER" --install \
@@ -51,34 +41,26 @@ jobs:
             "platforms;android-36" \
             "build-tools;35.0.0" \
             "build-tools;36.0.0"
-            
-      - name: Install Dependencies
+           - name: Install Dependencies
         run: npm install --legacy-peer-deps
-
       - name: Build Web Application
-        run: npm run build
-      
-      
+        run: npm run build    
       - name: Install Capacitor Android
         run: |
           CAP_VERSION=$(node -p "require('./node_modules/@capacitor/core/package.json').version")
           npm install --no-save --legacy-peer-deps "@capacitor/android@$CAP_VERSION"
-
       - name: Add Android Platform
         run: |
           if [ ! -d android ]; then
             npx cap add android
           fi
-
       - name: Capacitor Android Sync
         run: npx cap sync android
-
       - name: Build Debug APK
         run: |
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug
-
       - name: Upload Android APK
         uses: actions/upload-artifact@v4
         with:
@@ -87,13 +69,11 @@ jobs:
           if-no-files-found: error
           CAP_VERSION=$(node -p "require('./node_modules/@capacitor/core/package.json').version")
           npm install --no-save --legacy-peer-deps "@capacitor/android@$CAP_VERSION"
-
       - name: Add Android Platform
         run: |
           if [ ! -d android ]; then
             npx cap add android
           fi
-
       - name: Capacitor Android Sync
         run: npx cap sync android
 
