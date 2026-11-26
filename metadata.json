@@ -1,0 +1,6 @@
+{
+  "name": "Good Chat",
+  "description": "Connect, chat, and share with friends, family, and teams in a fast, clean messaging workspace.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

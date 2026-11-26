@@ -1,0 +1,256 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Pillar 1: Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ── Global Hardened Primitives ─────────────────────────────────────────
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isOwner(userId) {
+      return isVerifiedUser() && request.auth.uid == userId;
+    }
+
+    function isValidDuration(minutes) {
+      return minutes is int && (minutes == 15 || minutes == 60 || minutes == 480);
+    }
+
+    function isValidViewerEmailList(listVal) {
+      return listVal is list
+        && listVal.size() <= 10
+        && (listVal.size() == 0 || (listVal[0] is string && listVal[0].size() >= 3 && listVal[0].size() <= 120));
+    }
+
+    // ── Entity Validation Blueprint: UserLocationProfile ───────────────────
+    function isValidUserProfile(data, userId) {
+      return data.keys().hasAll([
+          'uid',
+          'displayName',
+          'photoUrl',
+          'locationSharingEnabled',
+          'defaultDurationMinutes',
+          'highAccuracyGps',
+          'backgroundConsentGranted',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'uid',
+          'displayName',
+          'photoUrl',
+          'locationSharingEnabled',
+          'defaultDurationMinutes',
+          'highAccuracyGps',
+          'backgroundConsentGranted',
+          'updatedAt'
+        ])
+        && data.uid is string
+        && data.uid == userId
+        && data.uid == request.auth.uid
+        && data.displayName is string
+        && data.displayName.size() >= 1
+        && data.displayName.size() <= 80
+        && data.photoUrl is string
+        && data.photoUrl.size() <= 500
+        && data.locationSharingEnabled is bool
+        && isValidDuration(data.defaultDurationMinutes)
+        && data.highAccuracyGps is bool
+        && data.backgroundConsentGranted is bool
+        && data.updatedAt is timestamp
+        && data.updatedAt == request.time;
+    }
+
+    // ── Entity Validation Blueprint: LiveLocationShare ─────────────────────
+    function isValidLocationShare(data) {
+      return data.keys().hasAll([
+          'ownerUid',
+          'ownerName',
+          'ownerPhotoUrl',
+          'chatKey',
+          'chatName',
+          'latitude',
+          'longitude',
+          'accuracy',
+          'heading',
+          'speed',
+          'durationMinutes',
+          'active',
+          'consentGranted',
+          'allowedViewerEmails',
+          'expiresAtMs',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerUid',
+          'ownerName',
+          'ownerPhotoUrl',
+          'chatKey',
+          'chatName',
+          'latitude',
+          'longitude',
+          'accuracy',
+          'heading',
+          'speed',
+          'durationMinutes',
+          'active',
+          'consentGranted',
+          'allowedViewerEmails',
+          'expiresAtMs',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.ownerUid is string
+        && data.ownerUid.size() >= 1
+        && data.ownerUid.size() <= 128
+        && data.ownerUid == request.auth.uid
+        && data.ownerName is string
+        && data.ownerName.size() >= 1
+        && data.ownerName.size() <= 80
+        && data.ownerPhotoUrl is string
+        && data.ownerPhotoUrl.size() <= 500
+        && data.chatKey is string
+        && data.chatKey.size() >= 1
+        && data.chatKey.size() <= 64
+        && data.chatKey.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.chatName is string
+        && data.chatName.size() >= 1
+        && data.chatName.size() <= 80
+        && data.latitude is number
+        && data.latitude >= -90
+        && data.latitude <= 90
+        && data.longitude is number
+        && data.longitude >= -180
+        && data.longitude <= 180
+        && data.accuracy is number
+        && data.accuracy >= 0
+        && data.accuracy <= 100000
+        && data.heading is number
+        && data.heading >= -1
+        && data.heading <= 360
+        && data.speed is number
+        && data.speed >= -1
+        && data.speed <= 500
+        && isValidDuration(data.durationMinutes)
+        && data.active is bool
+        && data.consentGranted is bool
+        && data.consentGranted == true
+        && isValidViewerEmailList(data.allowedViewerEmails)
+        && data.expiresAtMs is number
+        && data.expiresAtMs > 0
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp
+        && data.updatedAt == request.time;
+    }
+
+    function canViewLocationShare(docData) {
+      return isVerifiedUser() && (
+        docData.ownerUid == request.auth.uid ||
+        (request.auth.token.email is string && request.auth.token.email in docData.allowedViewerEmails)
+      );
+    }
+
+    // ── Collection: users/{userId} (Private Owner Profile & Settings) ──────
+    match /users/{userId} {
+      allow get: if isValidId(userId) && isOwner(userId);
+      allow list: if false;
+      allow create: if isValidId(userId)
+        && isOwner(userId)
+        && isValidUserProfile(incoming(), userId);
+      allow update: if isValidId(userId)
+        && isOwner(userId)
+        && isValidUserProfile(incoming(), userId)
+        && incoming().uid == existing().uid
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'displayName',
+          'photoUrl',
+          'locationSharingEnabled',
+          'defaultDurationMinutes',
+          'highAccuracyGps',
+          'backgroundConsentGranted',
+          'updatedAt'
+        ]);
+      allow delete: if isValidId(userId) && isOwner(userId);
+    }
+
+    // ── Collection: locationShares/{shareId} ───────────────────────────────
+    match /locationShares/{shareId} {
+      allow get: if isValidId(shareId) && canViewLocationShare(existing());
+      allow list: if canViewLocationShare(existing());
+
+      allow create: if isValidId(shareId)
+        && isVerifiedUser()
+        && isValidLocationShare(incoming())
+        && incoming().active == true
+        && incoming().createdAt == request.time;
+
+      allow update: if isValidId(shareId)
+        && isVerifiedUser()
+        && isValidLocationShare(incoming())
+        && existing().ownerUid == request.auth.uid
+        && existing().active == true
+        && incoming().ownerUid == existing().ownerUid
+        && incoming().chatKey == existing().chatKey
+        && incoming().durationMinutes == existing().durationMinutes
+        && incoming().consentGranted == existing().consentGranted
+        && incoming().createdAt == existing().createdAt
+        && incoming().expiresAtMs == existing().expiresAtMs
+        && (
+          // Action 1: Push real-time GPS coordinate update while session is active
+          (
+            incoming().active == true
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'latitude',
+              'longitude',
+              'accuracy',
+              'heading',
+              'speed',
+              'updatedAt'
+            ])
+          )
+          ||
+          // Action 2: Update explicitly authorized viewer list while session is active
+          (
+            incoming().active == true
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'allowedViewerEmails',
+              'updatedAt'
+            ])
+          )
+          ||
+          // Action 3: Stop live location sharing (terminal transition active -> false)
+          (
+            incoming().active == false
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'active',
+              'updatedAt'
+            ])
+          )
+        );
+
+      allow delete: if isValidId(shareId)
+        && isVerifiedUser()
+        && existing().ownerUid == request.auth.uid;
+    }
+  }
+}

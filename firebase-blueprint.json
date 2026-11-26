@@ -1,0 +1,183 @@
+{
+  "entities": {
+    "UserLocationProfile": {
+      "title": "UserLocationProfile",
+      "description": "Private per-user Good Chat profile and live location sharing preferences.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID of the profile owner."
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "description": "User display name shown on live location markers."
+        },
+        "photoUrl": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Optional profile avatar URL from Firebase Auth."
+        },
+        "locationSharingEnabled": {
+          "type": "boolean",
+          "description": "Master switch allowing live location sharing."
+        },
+        "defaultDurationMinutes": {
+          "type": "integer",
+          "enum": [15, 60, 480],
+          "description": "Preferred default sharing window in minutes (15m, 1h, or 8h)."
+        },
+        "highAccuracyGps": {
+          "type": "boolean",
+          "description": "Whether browser/device high-accuracy GPS is requested."
+        },
+        "backgroundConsentGranted": {
+          "type": "boolean",
+          "description": "Explicit user consent for background location updates."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of the last settings update."
+        }
+      },
+      "required": [
+        "uid",
+        "displayName",
+        "photoUrl",
+        "locationSharingEnabled",
+        "defaultDurationMinutes",
+        "highAccuracyGps",
+        "backgroundConsentGranted",
+        "updatedAt"
+      ]
+    },
+    "LiveLocationShare": {
+      "title": "LiveLocationShare",
+      "description": "Real-time GPS location sharing session scoped to explicit consenting viewers.",
+      "type": "object",
+      "properties": {
+        "ownerUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID of the user sharing their GPS location."
+        },
+        "ownerName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "description": "Display name of the sharing user."
+        },
+        "ownerPhotoUrl": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Profile photo URL of the sharing user."
+        },
+        "chatKey": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Identifier of the Good Chat conversation where sharing started."
+        },
+        "chatName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "description": "Name of the Good Chat conversation."
+        },
+        "latitude": {
+          "type": "number",
+          "description": "GPS latitude in decimal degrees (-90 to 90)."
+        },
+        "longitude": {
+          "type": "number",
+          "description": "GPS longitude in decimal degrees (-180 to 180)."
+        },
+        "accuracy": {
+          "type": "number",
+          "description": "GPS accuracy radius in meters."
+        },
+        "heading": {
+          "type": "number",
+          "description": "Device heading in degrees (0-360, or -1 if unavailable)."
+        },
+        "speed": {
+          "type": "number",
+          "description": "Speed in meters/second (or -1 if unavailable)."
+        },
+        "durationMinutes": {
+          "type": "integer",
+          "enum": [15, 60, 480],
+          "description": "Chosen live sharing window (15, 60, or 480 minutes)."
+        },
+        "active": {
+          "type": "boolean",
+          "description": "True while live GPS updates are streaming; false once stopped."
+        },
+        "consentGranted": {
+          "type": "boolean",
+          "description": "Explicit owner consent acknowledgement (must be true on create)."
+        },
+        "allowedViewerEmails": {
+          "type": "array",
+          "description": "Bounded list (max 10) of verified contact emails authorized to view this live location."
+        },
+        "expiresAtMs": {
+          "type": "number",
+          "description": "Unix epoch millisecond timestamp when the live share expires."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when live sharing began."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of the latest GPS coordinate update."
+        }
+      },
+      "required": [
+        "ownerUid",
+        "ownerName",
+        "ownerPhotoUrl",
+        "chatKey",
+        "chatName",
+        "latitude",
+        "longitude",
+        "accuracy",
+        "heading",
+        "speed",
+        "durationMinutes",
+        "active",
+        "consentGranted",
+        "allowedViewerEmails",
+        "expiresAtMs",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/UserLocationProfile"
+      },
+      "description": "Private user profile and live location sharing settings readable and writable strictly by the authenticated owner."
+    },
+    "/locationShares/{shareId}": {
+      "schema": {
+        "$ref": "#/entities/LiveLocationShare"
+      },
+      "description": "Real-time live GPS sharing sessions readable only by the owner and explicitly authorized verified contact emails."
+    }
+  }
+}
