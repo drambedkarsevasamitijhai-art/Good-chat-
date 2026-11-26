@@ -51,23 +51,3 @@ jobs:
           name: GoodChat-Android-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk
           
-: actions/setup-node@v4
-        with:
-          node-version: "22"
-      - name: Set up Java 21 (Temurin)
-        uses: actions/setup-java@v4
-        with:
-          distribution: "temurin"
-          java-version: "21"
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-      - name: Install Node dependencies
-        run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            npm install
-          fi
-      - name: Build Good Chat Web Bundle
-        env:
-          VITE_API_BASE_URL: ${{ inputs.api_base_url || vars.GOODCHAT_API_URL || 'https://ais-pre-flj6rueiohzsnor2wpluv5-637593678152.asia-southeast1.run.app' }}
